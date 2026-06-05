@@ -4,7 +4,8 @@ from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.firefox.options import Options as FirefoxOptions
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from locators import AuthPageLocators
+from selenium.webdriver.common.by import By
+from locators import AuthPageLocators, MainPageLocators
 from data import Urls
 import helpers
 
@@ -31,15 +32,14 @@ def driver(request):
     driver.quit()
 
 @pytest.fixture
-def logged_in_user(driver):
-    """Фикстура для создания и авторизации пользователя"""
+def registered_user(driver):
+    """Фикстура для создания зарегистрированного пользователя (без авторизации)"""
     driver.get(Urls.REGISTER_PAGE)
     
     test_email = helpers.generate_unique_email()
     test_password = helpers.generate_valid_password()
     test_name = helpers.generate_name()
     
-    # Регистрация
     driver.find_element(*AuthPageLocators.NAME_INPUT).send_keys(test_name)
     driver.find_element(*AuthPageLocators.EMAIL_INPUT).send_keys(test_email)
     driver.find_element(*AuthPageLocators.PASSWORD_INPUT).send_keys(test_password)
@@ -48,15 +48,25 @@ def logged_in_user(driver):
     # Ждем перехода на страницу логина
     WebDriverWait(driver, 10).until(EC.url_to_be(Urls.LOGIN_PAGE))
     
-    # Логинимся
-    driver.find_element(*AuthPageLocators.EMAIL_INPUT).send_keys(test_email)
-    driver.find_element(*AuthPageLocators.PASSWORD_INPUT).send_keys(test_password)
+    return {
+        "email": test_email,
+        "password": test_password,
+        "name": test_name
+    }
+
+@pytest.fixture
+def logged_in_user(driver, registered_user):
+    """Фикстура для авторизованного пользователя"""
+    driver.get(Urls.LOGIN_PAGE)
+    
+    driver.find_element(*AuthPageLocators.EMAIL_INPUT).send_keys(registered_user["email"])
+    driver.find_element(*AuthPageLocators.PASSWORD_INPUT).send_keys(registered_user["password"])
     driver.find_element(*AuthPageLocators.LOGIN_BUTTON).click()
     
     # Ждем успешного входа
     WebDriverWait(driver, 10).until(EC.url_to_be(Urls.MAIN_PAGE))
     WebDriverWait(driver, 10).until(
-        EC.visibility_of_element_located((By.XPATH, "//p[text()='Личный Кабинет']"))
+        EC.visibility_of_element_located(MainPageLocators.PERSONAL_ACCOUNT)
     )
     
     yield driver
